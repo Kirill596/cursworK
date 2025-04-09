@@ -1,4 +1,7 @@
+# JetBrains IDE files
+.idea/
+*.iml
+
+# Python cache files
 __pycache__/
-.venv/
-.env
-*.log
+*.pyc
