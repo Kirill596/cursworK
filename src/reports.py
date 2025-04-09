@@ -34,4 +34,6 @@ def search_category(transactions: pd.DataFrame, category: str, date: Optional[pd
 
 
 def reports_() -> None:
-    print(f'\nОтсчет: {search_category(read_files("../data/operations.xls"), "еда", datetime(2022, 4, 10))}')
+    # noinspection PyTypeChecker
+    print(f'\nОтсчет: {search_category(read_files("../data/operations.xls"), "еда", 
+                                       datetime(2022, 4, 10))}')
