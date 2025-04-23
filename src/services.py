@@ -1,60 +1,34 @@
-from typing import Any
+"""
+Бизнес-функции сервисного слоя.
+Здесь реализован &laquo;Простой поиск&raquo; — фильтрация по `description`.
+"""
 
-from src.utils import setup_logging, write_data
+from __future__ import annotations
 
-logger = setup_logging()
+import logging
+from typing import Dict, List
 
-
-def filter_state(operations: list[dict[Any, Any]]) -> list:
-    """Функция, которая принимает на вход список транзакций
-    и возвращает новый список, содержащий только те словари, у которых ключ содержит переданное в функцию значение."""
-    result = []
-    for operation in operations:
-        if "Переводы" in operation["Категория"]:
-            if operation["Описание"].endswith("."):
-                result.append(operation)
-    logger.info("Результат 'filter_state' - %s" % result)
-    write_data("servies.json", result)
-    return result
+logger = logging.getLogger(__name__)
 
 
-def servies_() -> None:
-    translate = filter_state(
-        [
-            {
-                "Дата операции": "16.10.2021 15:16:16",
-                "Дата платежа": "16.10.2021",
-                "Номер карты": None,
-                "Статус": "OK",
-                "Сумма операции": -50.0,
-                "Валюта операции": "RUB",
-                "Сумма платежа": -50.0,
-                "Валюта платежа": "RUB",
-                "Кэшбэк": None,
-                "Категория": "Переводы",
-                "MCC": None,
-                "Описание": "Азер Г.",
-                "Бонусы (включая кэшбэк)": 0,
-                "Округление на инвесткопилку": 0,
-                "Сумма операции с округлением": 50.0,
-            },
-            {
-                "Дата операции": "15.10.2021 21:25:17",
-                "Дата платежа": "16.10.2021",
-                "Номер карты": "*7197",
-                "Статус": "OK",
-                "Сумма операции": -86.0,
-                "Валюта операции": "RUB",
-                "Сумма платежа": -86.0,
-                "Валюта платежа": "RUB",
-                "Кэшбэк": None,
-                "Категория": "Местный транспорт",
-                "MCC": 4111.0,
-                "Описание": "Северо-Западная пригородная пассажирская компания",
-                "Бонусы (включая кэшбэк)": 1,
-                "Округление на инвесткопилку": 0,
-                "Сумма операции с округлением": 86.0,
-            },
-        ]
-    )
-    print(f"\nСервисы: {translate}")
+def simple_search(query: str, transactions: List[dict]) -> Dict:
+    """
+    Найти транзакции, где `query` входит в поле `description` (регистр не важен).
+
+    Parameters
+    ----------
+    query:
+        Строка-запрос.
+    transactions:
+        Коллекция транзакций вида::
+
+            {"description": "Coffee shop", "amount": -300, ...}
+
+    Returns
+    -------
+    dict
+        JSON-объект с полями ``query``, ``count`` и ``items``.
+    """
+    q = query.lower()
+    found = [txn for txn in transactions if q in str(txn.get("description", "")).lower()]
+    return {"query": query, "count": len(found), "items": found}

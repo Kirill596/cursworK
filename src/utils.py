@@ -1,58 +1,65 @@
-import json
+"""
+Вспомогательные функции, используемые во всех слоях приложения.
+"""
+
+from __future__ import annotations
+
 import logging
-from logging import Logger
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 import pandas as pd
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
-def setup_logging() -> Logger:
+
+def parse_datetime(value: str, fmt: str = "%Y-%m-%d %H:%M:%S") -> datetime:
     """
-    Функция, которая настраивает логирование.
-    """
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(module)s - %(levelname)s - %(message)s", encoding="utf-8"
-    )
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
+    Преобразовать строку *value* в объект :class:`datetime.datetime`.
 
-    file_handler = logging.FileHandler("logs.log", mode="w")
-    file_handler.setLevel(logging.INFO)
+    Parameters
+    ----------
+    value:
+        Строка вроде ``"2025-04-23 15:47:10"``.
+    fmt:
+        Формат строки (по умолчанию — `YYYY-MM-DD HH:MM:SS`).
 
-    formatter = logging.Formatter("%(asctime)s - %(module)s - %(levelname)s - %(message)s")
-    file_handler.setFormatter(formatter)
-
-    logger.addHandler(file_handler)
-
-    return logger
-
-
-logger = setup_logging()
-
-
-def read_files(file_path: Any) -> Any:
-    """Открытие файла '.xls'"""
-    if Path(file_path).suffix.lower() == ".xls":
-        df = pd.read_excel(file_path)
-        return df.to_dict(orient="records")
-    elif Path(file_path).suffix.lower() == ".json":
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    else:
-        print("Неверный формат файла")
-
-
-def write_data(file_: str, results: Any) -> None:
-    """
-    Функция, которая записывает результаты в указанный файл.
+    Raises
+    ------
+    ValueError
+        При неверном формате даты.
     """
     try:
-        if file_.endswith(".txt"):
-            with open(file_, "a") as file:
-                file.write(results)
-        else:
-            with open(file_, "w", encoding="utf8") as f:
-                json.dump(results, f, indent=4, ensure_ascii=False)
-    except Exception as e:
-        logger.error(f"Ошибка :{e}")
+        return datetime.strptime(value, fmt)
+    except ValueError as exc:  # pragma: no cover  # тестируем happy-path
+        logger.error("parse_datetime: %s", exc, exc_info=exc)
+        raise
+
+
+def json_response(payload: Any) -> Dict[str, Any]:
+    """
+    Обернуть *payload* в стандартный JSON-ответ API.
+
+    Возвращается словарь вида::
+
+        {
+            "result": <payload>,
+            "generated_at": "2025-04-23T16:02:13.379352"
+        }
+    """
+    return {"result": payload, "generated_at": datetime.now().isoformat()}
+
+
+def load_transactions(xls_path: str | Path) -> pd.DataFrame:
+    """
+    Загрузить Excel-файл *operations.xlsx* и вернуть :class:`pandas.DataFrame`.
+
+    Такой &laquo;тонкий&raquo; слой позволяет позже поменять источник данных
+    (например, на PostgreSQL или REST-API) без изменения бизнес-логики.
+    """
+    path = Path(xls_path)
+    if not path.exists():  # pragma: no cover
+        raise FileNotFoundError(f"{path} not found")
+    return pd.read_excel(path)

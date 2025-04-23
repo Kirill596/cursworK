@@ -1,39 +1,54 @@
-import json
-from datetime import datetime, timedelta
-from typing import Any, Optional
+"""
+Отчёт &laquo;Траты по категории за 3 месяца&raquo; (см. ТЗ).
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Dict
 
 import pandas as pd
 
-from src.utils import read_files, setup_logging
-
-logger = setup_logging()
+logger = logging.getLogger(__name__)
 
 
-def search_category(transactions: pd.DataFrame, category: str, date: Optional[pd.Timestamp] = None) -> Any:
-    """Функция, которая принимает на вход список транзакций
-    и возвращает новый список, содержащий только те словари, у которых ключ содержит переданное в функцию значение."""
-    transactions = pd.DataFrame(transactions)
-    if date is None:
-        date = pd.to_datetime("today")
-    result = {}
-    transactions["Дата операции"] = pd.to_datetime(transactions["Дата операции"], dayfirst=True)
-    total = -transactions[
-        (transactions["Дата операции"] >= date - timedelta(days=90))
-        & (transactions["Дата операции"] <= date)
-        & (transactions["Категория"] == category)
-    ]["Сумма операции"]
-    if not total.empty:
-        result["amount"] = total.to_dict()
-        result["category"] = category
-        result["total"] = total.sum().item()
-        with open("reports.json", "w", encoding="utf8") as f:
-            json.dump(result, f, indent=4, ensure_ascii=False)
+def spending_by_category(df: pd.DataFrame, category: str, since: str) -> Dict:
+    """
+    Вернуть JSON-отчёт о тратах *category* за период `[since; since + 3 месяца)`.
 
-        logger.info(f"Result - {result}")
-        return result
+    Parameters
+    ----------
+    df:
+        Таблица транзакций (обязательно есть колонки ``date``, ``category``, ``amount``).
+    category:
+        Интересующая категория (регистр игнорируется).
+    since:
+        Дата начала отчётного периода ``YYYY-MM-DD``.
 
+    Returns
+    -------
+    dict
+        Итоговая сумма и дневная разбивка.
+    """
+    start = pd.to_datetime(since)
+    end = start + pd.DateOffset(months=3)
 
-def reports_() -> None:
-    # noinspection PyTypeChecker
-    print(f'\nОтсчет: {search_category(read_files("../data/operations.xls"), "еда", 
-                                       datetime(2022, 4, 10))}')
+    mask = (df["category"].str.lower() == category.lower()) & (df["date"] >= start) & (df["date"] < end)
+
+    subtotal = df.loc[mask, "amount"].sum().round(2)
+
+    daily = (
+        df.loc[mask]
+        .assign(day=lambda x: x["date"].dt.date)
+        .groupby("day")["amount"]
+        .sum()
+        .reset_index()
+        .to_dict(orient="records")
+    )
+
+    return {
+        "category": category,
+        "period": {"from": str(start.date()), "to": str(end.date())},
+        "total_spent": float(subtotal),
+        "daily_breakdown": daily,
+    }

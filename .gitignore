@@ -1,7 +1,10 @@
-# JetBrains IDE files
+# виртуальное окружение / IDE
+.venv/
 .idea/
-*.iml
 
-# Python cache files
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
+
+# скрытые ключи и данные
+.env
