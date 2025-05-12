@@ -1,56 +1,38 @@
-"""
-Функции-контроллеры &laquo;страниц&raquo;.
-Главная — `index`, События — `events`.
-"""
-
 from __future__ import annotations
 
-import logging
-from typing import Dict
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict
 
-import pandas as pd
+from .logger import logger
+from .utils import card_info, get_currency_rates, get_stock_prices, read_transactions, send_greeting, top_transactions
 
-from .utils import json_response, parse_datetime
-
-logger = logging.getLogger(__name__)
-
-
-def index(datetime_str: str) -> Dict:
-    """
-    &laquo;Главная&raquo; (короткая демо-страница).
-
-    Parameters
-    ----------
-    datetime_str:
-        Дата/время от клиента (``YYYY-MM-DD HH:MM:SS``).
-
-    Returns
-    -------
-    dict
-        JSON, удовлетворяющий ТЗ.
-    """
-    ts = parse_datetime(datetime_str)
-    greeting = f"Добро пожаловать! Сейчас {ts:%d.%m.%Y %H:%M}"
-    return json_response({"message": greeting})
+USER_SETTINGS_FILE = Path(__file__).resolve().parent.parent / "user_settings.json"
+DEFAULT_SETTINGS = {"user_currencies": ["USD", "EUR"], "user_stocks": ["AAPL", "AMZN", "GOOGL", "MSFT", "TSLA"]}
 
 
-def events(df: pd.DataFrame) -> Dict:
-    """
-    &laquo;События&raquo; — простейшая выборка из *df* (покажем 5 записей).
+def _load_settings() -> Dict[str, Any]:
+    if USER_SETTINGS_FILE.exists():
+        return json.loads(USER_SETTINGS_FILE.read_text(encoding="utf-8"))
+    return DEFAULT_SETTINGS
 
-    Parameters
-    ----------
-    df:
-        Таблица транзакций (как правило — `load_transactions`).
 
-    Returns
-    -------
-    dict
-        JSON со списком событий.
-    """
-    selection = (
-        df.head()  # в реальном коде здесь бизнес-логика фильтрации
-        .assign(date=lambda d: d["date"].dt.strftime("%Y-%m-%d"))
-        .to_dict(orient="records")
-    )
-    return json_response({"events": selection})
+def index(date_time_str: str, xlsx_path: str | Path = None) -> str:
+    """Return JSON string for *Главная* page."""
+    date_time = datetime.strptime(date_time_str, "%Y-%m-%d %H:%M:%S")
+    settings = _load_settings()
+
+    # Prepare data
+    df = read_transactions(xlsx_path or Path(__file__).resolve().parent.parent / "data" / "operations.xlsx")
+
+    response: Dict[str, Any] = {
+        "greeting": send_greeting(date_time),
+        "cards": card_info(df),
+        "top_transactions": top_transactions(df),
+        "currency_rates": get_currency_rates(settings["user_currencies"]),
+        "stock_prices": get_stock_prices(settings["user_stocks"]),
+    }
+
+    logger.info("Index page JSON generated.")
+    return json.dumps(response, ensure_ascii=False, indent=2)

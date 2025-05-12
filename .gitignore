@@ -6,5 +6,6 @@
 __pycache__/
 *.py[cod]
 
-# скрытые ключи и данные
 .env
+*.secret
+__pycache__
